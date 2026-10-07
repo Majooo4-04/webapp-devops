@@ -191,3 +191,16 @@ describe('RUTAS Y ERRORES GENERALES', () => {
     expect(res.statusCode).toBe(404);
   });
 });
+describe('RUTAS Y ERRORES GENERALES', () => {
+  test('GET /api/health - responde que la API está activa', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data[0].status).toBe('ok');
+    expect(res.body.data[0]).toHaveProperty('timestamp');
+  });
+
+  test('GET a una ruta inexistente devuelve 404', async () => {
+    const res = await request(app).get('/api/noexiste');
+    expect(res.statusCode).toBe(404);
+  });
+});
