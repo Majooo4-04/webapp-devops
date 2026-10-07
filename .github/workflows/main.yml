@@ -50,3 +50,25 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/webapp:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/webapp:${{ github.sha }}
+  deploy:
+    name: Desplegar en EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Desplegar en EC2 por SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull majitoflo/webapp:latest
+            docker stop webapp-container || true
+            docker rm webapp-container || true
+            docker run -d --name webapp-container --restart unless-stopped \
+              -p 80:80 \
+              -p 6061:6061 \
+              majitoflo/webapp:latest
+            docker image prune -f
