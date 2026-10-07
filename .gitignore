@@ -5,3 +5,6 @@ tests/data-test-socket/
 coverage/
 .env
 *.log
+app.py
+requirements.txt
+schema.sql
