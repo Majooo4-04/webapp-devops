@@ -72,3 +72,5 @@ jobs:
               -p 6061:6061 \
               majitoflo/webapp:latest
             docker image prune -f
+
+            
