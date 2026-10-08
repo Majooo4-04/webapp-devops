@@ -167,9 +167,14 @@ app.delete('/api/vaciar', (req, res) => {
   ok(res, [{ mensaje: 'Base de datos vaciada correctamente' }]);
 });
 // GET /api/health
-app.get('/api/health', (req, res) =>
-  ok(res, [{ status: 'ok', timestamp: new Date().toISOString() }])
-);
+app.get('/api/health', (req, res) => {
+  ok(res, [{
+    status: 'ok',
+    version: '1.1.0',
+    mensaje: 'Pipeline CI/CD funcionando correctamente',
+    timestamp: new Date().toISOString()
+  }]);
+});
 
 // 404 y manejo de errores
 app.use((req, res) => fail(res, 404, 'Ruta no encontrada'));
