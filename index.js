@@ -5,6 +5,10 @@ const { iniciarServidorSocket } = require('./socket-server');
 
 const app = express();
 app.use(express.json());
+app.use('/app', express.static(path.join(__dirname, 'public')));
+
+const { metricsMiddleware } = require('./telemetry-middleware');
+app.use(metricsMiddleware);
 
 // Formato de respuesta estándar: { statusCode, data: [] }
 const ok = (res, data = []) => res.status(200).json({ statusCode: 200, data });

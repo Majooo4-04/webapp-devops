@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de Categorías</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f4f6f8; margin: 0; color: #1f2937; }
+    main { max-width: 640px; margin: 40px auto; background: #fff; padding: 24px 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    h1 { margin-top: 0; font-size: 1.6rem; }
+    .estado { font-size: .9rem; margin-bottom: 16px; }
+    #estado-api { font-weight: 600; }
+    #estado-api.ok { color: #15803d; }
+    #estado-api.error { color: #b91c1c; }
+    form { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+    label { width: 100%; font-weight: 600; font-size: .9rem; }
+    input { flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; }
+    button { padding: 8px 16px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    #mensaje { min-height: 1.4em; margin: 12px 0; font-size: .95rem; }
+    #mensaje.ok { color: #15803d; }
+    #mensaje.error { color: #b91c1c; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="titulo">Panel de Categorías</h1>
+    <p class="estado">Estado de la API: <span id="estado-api">comprobando...</span></p>
+
+    <form id="form-categoria">
+      <label for="nombre">Nombre de la categoría</label>
+      <input id="nombre" name="nombre" type="text" placeholder="Ej. Deportes" autocomplete="off">
+      <button id="btn-agregar" type="submit">Agregar categoría</button>
+    </form>
+
+    <p id="mensaje" role="status"></p>
+
+    <table id="tabla-categorias">
+      <thead><tr><th>ID</th><th>Nombre</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script>
+    const estadoApi = document.getElementById('estado-api');
+    const mensaje = document.getElementById('mensaje');
+    const cuerpoTabla = document.querySelector('#tabla-categorias tbody');
+    const form = document.getElementById('form-categoria');
+    const inputNombre = document.getElementById('nombre');
+
+    function mostrarMensaje(texto, tipo) {
+      mensaje.textContent = texto;
+      mensaje.className = tipo;
+    }
+
+    async function comprobarEstado() {
+      try {
+        const res = await fetch('/api/health');
+        const json = await res.json();
+        estadoApi.textContent = json.data[0].status;
+        estadoApi.className = 'ok';
+      } catch (err) {
+        estadoApi.textContent = 'Sin conexión';
+        estadoApi.className = 'error';
+      }
+    }
+
+    async function cargarCategorias() {
+      const res = await fetch('/api/categorias');
+      const json = await res.json();
+      cuerpoTabla.replaceChildren();
+      json.data.forEach((cat) => {
+        const fila = document.createElement('tr');
+        const celdaId = document.createElement('td');
+        const celdaNombre = document.createElement('td');
+        celdaId.textContent = cat.id;
+        celdaNombre.textContent = cat.nombre;
+        fila.append(celdaId, celdaNombre);
+        cuerpoTabla.appendChild(fila);
+      });
+    }
+
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      const res = await fetch('/api/categorias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: inputNombre.value })
+      });
+      const json = await res.json();
+      if (json.statusCode === 200) {
+        mostrarMensaje('Categoría creada correctamente', 'ok');
+        inputNombre.value = '';
+        await cargarCategorias();
+      } else {
+        mostrarMensaje(json.message, 'error');
+      }
+    });
+
+    comprobarEstado();
+    cargarCategorias();
+  </script>
+</body>
+</html>

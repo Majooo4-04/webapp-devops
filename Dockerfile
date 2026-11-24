@@ -13,7 +13,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copiar el código de la aplicación
+# Copiar el código de la aplicación (incluye public/ y tracing.js)
 COPY . .
 
 # La app escucha en el puerto 80 dentro del contenedor
@@ -22,4 +22,5 @@ ENV DATA_DIR=/app/data
 
 EXPOSE 80 6061
 
-CMD ["node", "index.js"]
+# Arranca con la instrumentación OpenTelemetry cargada primero
+CMD ["node", "--require", "./tracing.js", "index.js"]

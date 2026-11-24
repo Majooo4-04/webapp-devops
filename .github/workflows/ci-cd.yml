@@ -1,0 +1,174 @@
+name: CI/CD Pipeline - API REST
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Pruebas (Jest + Playwright)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas unitarias y de integración (Jest)
+        run: npm test
+
+      - name: Instalar navegador de Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Pruebas de extremo a extremo (Playwright - API y UI)
+        run: npm run test:e2e
+
+      - name: Guardar reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Registrar resultado de las pruebas en OpenObserve
+        if: always()
+        continue-on-error: true
+        env:
+          RESULTADO: ${{ job.status }}
+          COMMIT: ${{ github.sha }}
+          RAMA: ${{ github.ref_name }}
+          USUARIO: ${{ github.actor }}
+          DISPARADOR: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          O2_URL: ${{ secrets.O2_URL }}
+          O2_BASIC_TOKEN: ${{ secrets.O2_BASIC_TOKEN }}
+        run: |
+          jq -n \
+            --arg evento "pruebas" \
+            --arg resultado "$RESULTADO" \
+            --arg commit "$COMMIT" \
+            --arg rama "$RAMA" \
+            --arg usuario "$USUARIO" \
+            --arg disparador "$DISPARADOR" \
+            --arg run_url "$RUN_URL" \
+            '[{evento:$evento, resultado:$resultado, commit:$commit, rama:$rama, usuario:$usuario, disparador:$disparador, run_url:$run_url}]' \
+          | curl -sS -m 20 -X POST "$O2_URL/api/default/ci_pipeline/_json" \
+              -H "Authorization: Basic $O2_BASIC_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @-
+
+  bloqueo:
+    name: Registrar despliegue bloqueado
+    needs: test
+    runs-on: ubuntu-latest
+    if: always() && needs.test.result == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Registrar bloqueo en OpenObserve
+        continue-on-error: true
+        env:
+          COMMIT: ${{ github.sha }}
+          RAMA: ${{ github.ref_name }}
+          USUARIO: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          O2_URL: ${{ secrets.O2_URL }}
+          O2_BASIC_TOKEN: ${{ secrets.O2_BASIC_TOKEN }}
+        run: |
+          jq -n \
+            --arg commit "$COMMIT" \
+            --arg rama "$RAMA" \
+            --arg usuario "$USUARIO" \
+            --arg run_url "$RUN_URL" \
+            '[{evento:"despliegue_bloqueado", resultado:"bloqueado", motivo:"fallaron las pruebas", commit:$commit, rama:$rama, usuario:$usuario, run_url:$run_url}]' \
+          | curl -sS -m 20 -X POST "$O2_URL/api/default/ci_pipeline/_json" \
+              -H "Authorization: Basic $O2_BASIC_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @-
+
+  build-and-push:
+    name: Construir y publicar imagen Docker
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir y publicar la imagen
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/webapp:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/webapp:${{ github.sha }}
+
+  deploy:
+    name: Desplegar en EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Desplegar en EC2 por SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/webapp:latest
+            docker stop webapp-container || true
+            docker rm webapp-container || true
+            docker run -d --name webapp-container --restart unless-stopped \
+              --add-host=host.docker.internal:host-gateway \
+              --env-file $HOME/webapp.env \
+              -v $HOME/webapp-data:/app/data \
+              -p 80:80 -p 6061:6061 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/webapp:latest
+            docker image prune -f
+            sleep 8
+            curl -fsS http://localhost/api/health
+
+      - name: Registrar despliegue en OpenObserve
+        if: always()
+        continue-on-error: true
+        env:
+          RESULTADO: ${{ job.status }}
+          COMMIT: ${{ github.sha }}
+          RAMA: ${{ github.ref_name }}
+          USUARIO: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          O2_URL: ${{ secrets.O2_URL }}
+          O2_BASIC_TOKEN: ${{ secrets.O2_BASIC_TOKEN }}
+        run: |
+          jq -n \
+            --arg resultado "$RESULTADO" \
+            --arg commit "$COMMIT" \
+            --arg rama "$RAMA" \
+            --arg usuario "$USUARIO" \
+            --arg run_url "$RUN_URL" \
+            '[{evento:"despliegue_ec2", resultado:$resultado, commit:$commit, rama:$rama, usuario:$usuario, run_url:$run_url}]' \
+          | curl -sS -m 20 -X POST "$O2_URL/api/default/ci_pipeline/_json" \
+              -H "Authorization: Basic $O2_BASIC_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @-

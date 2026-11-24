@@ -8,3 +8,13 @@ coverage/
 app.py
 requirements.txt
 schema.sql
+
+
+node_modules
+data
+data-test
+data-test-socket
+data-e2e
+playwright-report
+test-results
+coverage
