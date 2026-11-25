@@ -1,9 +1,11 @@
 const { test, expect } = require('@playwright/test');
+const { entrarComoAdmin } = require('./helpers');
 
 const unico = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
 test.describe('Interfaz web (E2E con Playwright)', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, request }) => {
+    await entrarComoAdmin(page, request);
     await page.goto('/app/');
   });
 

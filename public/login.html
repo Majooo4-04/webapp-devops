@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iniciar sesión</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main class="angosto">
+    <h1 id="titulo">Iniciar sesión</h1>
+    <form id="form-login" class="apilado">
+      <label for="email">Correo electrónico
+        <input id="email" name="email" type="email" autocomplete="username" placeholder="usuario@correo.com">
+      </label>
+      <label for="password">Contraseña
+        <input id="password" name="password" type="password" autocomplete="current-password">
+      </label>
+      <button id="btn-login" type="submit">Entrar</button>
+    </form>
+    <p id="mensaje" class="mensaje" role="status"></p>
+  </main>
+  <script src="comun.js"></script>
+  <script>
+    if (Sesion.token()) location.href = '/app/';
+    const form = document.getElementById('form-login');
+    const mensaje = document.getElementById('mensaje');
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      const json = await api('/api/login', {
+        method: 'POST',
+        body: { email: document.getElementById('email').value, password: document.getElementById('password').value },
+      });
+      if (json.statusCode === 200) {
+        Sesion.guardar(json.data[0].token, json.data[0].usuario);
+        location.href = '/app/';
+      } else {
+        mostrarMensaje(mensaje, json.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

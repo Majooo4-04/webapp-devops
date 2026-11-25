@@ -1,8 +1,17 @@
 const { test, expect } = require('@playwright/test');
+const { sesionApi, cabeceras } = require('./helpers');
 
 const unico = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
 test.describe('API REST (E2E con Playwright)', () => {
+  let headers;
+
+  test.beforeAll(async ({ playwright, baseURL }) => {
+    const ctx = await playwright.request.newContext({ baseURL });
+    headers = cabeceras((await sesionApi(ctx)).token);
+    await ctx.dispose();
+  });
+
   test('GET /api/health responde con estado Listo', async ({ request }) => {
     const res = await request.get('/api/health');
     expect(res.status()).toBe(200);
@@ -13,7 +22,7 @@ test.describe('API REST (E2E con Playwright)', () => {
 
   test('POST /api/categorias crea y GET /api/categorias la lista', async ({ request }) => {
     const nombre = `Cat-${unico()}`;
-    const crear = await request.post('/api/categorias', { data: { nombre } });
+    const crear = await request.post('/api/categorias', { data: { nombre }, headers });
     expect(crear.status()).toBe(200);
     const creada = (await crear.json()).data[0];
     expect(creada.nombre).toBe(nombre);
@@ -24,9 +33,14 @@ test.describe('API REST (E2E con Playwright)', () => {
   });
 
   test('POST /api/categorias sin nombre devuelve 400', async ({ request }) => {
-    const res = await request.post('/api/categorias', { data: {} });
+    const res = await request.post('/api/categorias', { data: {}, headers });
     expect(res.status()).toBe(400);
     expect((await res.json()).statusCode).toBe(400);
+  });
+
+  test('POST /api/categorias sin sesión devuelve 401', async ({ request }) => {
+    const res = await request.post('/api/categorias', { data: { nombre: 'Sin token' } });
+    expect(res.status()).toBe(401);
   });
 
   test('ruta inexistente devuelve 404', async ({ request }) => {
@@ -37,23 +51,26 @@ test.describe('API REST (E2E con Playwright)', () => {
   test('flujo completo: categoría, producto, cliente y pedido descuentan stock', async ({ request }) => {
     const id = unico();
 
-    const cat = await request.post('/api/categorias', { data: { nombre: `Flujo-${id}` } });
+    const cat = await request.post('/api/categorias', { data: { nombre: `Flujo-${id}` }, headers });
     const categoriaId = (await cat.json()).data[0].id;
 
     const prod = await request.post('/api/productos', {
       data: { nombre: `Producto-${id}`, precio: 25.5, stock: 10, categoria_id: categoriaId },
+      headers,
     });
     expect(prod.status()).toBe(200);
     const productoId = (await prod.json()).data[0].id;
 
     const cli = await request.post('/api/clientes', {
       data: { nombre: `Cliente-${id}`, email: `cliente-${id}@correo.com` },
+      headers,
     });
     expect(cli.status()).toBe(200);
     const clienteId = (await cli.json()).data[0].id;
 
     const pedido = await request.post('/api/pedidos', {
       data: { cliente_id: clienteId, producto_id: productoId, cantidad: 3 },
+      headers,
     });
     expect(pedido.status()).toBe(200);
 
@@ -64,19 +81,22 @@ test.describe('API REST (E2E con Playwright)', () => {
 
   test('pedido con stock insuficiente devuelve 400', async ({ request }) => {
     const id = unico();
-    const cat = await request.post('/api/categorias', { data: { nombre: `Stock-${id}` } });
+    const cat = await request.post('/api/categorias', { data: { nombre: `Stock-${id}` }, headers });
     const categoriaId = (await cat.json()).data[0].id;
     const prod = await request.post('/api/productos', {
       data: { nombre: `Escaso-${id}`, precio: 10, stock: 1, categoria_id: categoriaId },
+      headers,
     });
     const productoId = (await prod.json()).data[0].id;
     const cli = await request.post('/api/clientes', {
       data: { nombre: `Cli-${id}`, email: `stock-${id}@correo.com` },
+      headers,
     });
     const clienteId = (await cli.json()).data[0].id;
 
     const pedido = await request.post('/api/pedidos', {
       data: { cliente_id: clienteId, producto_id: productoId, cantidad: 5 },
+      headers,
     });
     expect(pedido.status()).toBe(400);
   });

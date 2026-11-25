@@ -1,0 +1,17 @@
+FASE SISTEMA: Login + CRUD de usuarios + CRUD de productos
+
+1) Copiar estos archivos a C:\webapp respetando las carpetas (reemplazar los que existan):
+   sistema.js
+   public\index.html, login.html, productos.html, usuarios.html, comun.js, estilos.css
+   e2e\helpers.js, api.e2e.js, ui.e2e.js, sistema.e2e.js
+   tests\sistema.test.js
+
+2) Editar index.js: justo debajo de la linea
+      app.use(metricsMiddleware);
+   agregar:
+      require('./sistema')(app, db);
+
+3) Probar en local:  npm test   y   npm run test:e2e
+
+4) Credenciales iniciales (se crean solas si la tabla esta vacia):
+   admin@webapp.com / Admin#2026   (rol admin)

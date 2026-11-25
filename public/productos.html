@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Productos</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main>
+    <nav id="nav"></nav>
+    <h1 id="titulo">Gestión de Productos</h1>
+
+    <form id="form-producto" class="grid">
+      <input id="producto-id" type="hidden">
+      <label for="nombre">Nombre <input id="nombre" type="text" autocomplete="off"></label>
+      <label for="precio">Precio <input id="precio" type="number" step="0.01" min="0"></label>
+      <label for="stock">Stock <input id="stock" type="number" step="1" min="0" value="0"></label>
+      <label for="categoria">Categoría <select id="categoria"></select></label>
+      <div class="acciones">
+        <button id="btn-guardar" type="submit">Guardar producto</button>
+        <button id="btn-cancelar" class="secundario" type="button" hidden>Cancelar</button>
+      </div>
+    </form>
+    <p id="mensaje" class="mensaje" role="status"></p>
+
+    <table id="tabla-productos">
+      <thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Categoría</th><th>Acciones</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </main>
+  <script src="comun.js"></script>
+  <script>
+    exigirSesion();
+    pintarNavegacion();
+
+    const form = document.getElementById('form-producto');
+    const mensaje = document.getElementById('mensaje');
+    const cuerpo = document.querySelector('#tabla-productos tbody');
+    const campos = {
+      id: document.getElementById('producto-id'),
+      nombre: document.getElementById('nombre'),
+      precio: document.getElementById('precio'),
+      stock: document.getElementById('stock'),
+      categoria: document.getElementById('categoria'),
+    };
+    const btnCancelar = document.getElementById('btn-cancelar');
+
+    function limpiarFormulario() {
+      form.reset();
+      campos.id.value = '';
+      campos.stock.value = '0';
+      btnCancelar.hidden = true;
+      document.getElementById('btn-guardar').textContent = 'Guardar producto';
+    }
+
+    async function cargarCategorias() {
+      const json = await api('/api/categorias');
+      campos.categoria.replaceChildren();
+      json.data.forEach((c) => {
+        const op = document.createElement('option');
+        op.value = c.id;
+        op.textContent = c.nombre;
+        campos.categoria.appendChild(op);
+      });
+    }
+
+    function celda(texto) {
+      const td = document.createElement('td');
+      td.textContent = texto;
+      return td;
+    }
+
+    async function cargarProductos() {
+      const json = await api('/api/productos');
+      cuerpo.replaceChildren();
+      json.data.forEach((p) => {
+        const fila = document.createElement('tr');
+        fila.dataset.id = p.id;
+        const acciones = document.createElement('td');
+        acciones.className = 'acciones';
+        const editar = document.createElement('button');
+        editar.className = 'btn-editar chico';
+        editar.type = 'button';
+        editar.textContent = 'Editar';
+        editar.addEventListener('click', () => editarProducto(p.id));
+        const eliminar = document.createElement('button');
+        eliminar.className = 'btn-eliminar peligro chico';
+        eliminar.type = 'button';
+        eliminar.textContent = 'Eliminar';
+        eliminar.addEventListener('click', () => eliminarProducto(p.id, p.nombre));
+        acciones.append(editar, eliminar);
+        fila.append(celda(p.id), celda(p.nombre), celda(Number(p.precio).toFixed(2)), celda(p.stock), celda(p.categoria), acciones);
+        cuerpo.appendChild(fila);
+      });
+    }
+
+    async function editarProducto(id) {
+      const json = await api(`/api/productos/${id}`);
+      if (json.statusCode !== 200) return mostrarMensaje(mensaje, json.message, 'error');
+      const p = json.data[0];
+      campos.id.value = p.id;
+      campos.nombre.value = p.nombre;
+      campos.precio.value = p.precio;
+      campos.stock.value = p.stock;
+      campos.categoria.value = p.categoria_id;
+      btnCancelar.hidden = false;
+      document.getElementById('btn-guardar').textContent = 'Actualizar producto';
+    }
+
+    async function eliminarProducto(id, nombre) {
+      if (!confirm(`¿Eliminar el producto "${nombre}"?`)) return;
+      const json = await api(`/api/productos/${id}`, { method: 'DELETE' });
+      if (json.statusCode === 200) {
+        await cargarProductos();
+        mostrarMensaje(mensaje, 'Producto eliminado correctamente', 'ok');
+      } else {
+        mostrarMensaje(mensaje, json.message, 'error');
+      }
+    }
+
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      const datos = {
+        nombre: campos.nombre.value.trim(),
+        precio: Number(campos.precio.value),
+        stock: Number(campos.stock.value || 0),
+        categoria_id: Number(campos.categoria.value),
+      };
+      if (!datos.nombre || campos.precio.value === '' || !datos.categoria_id) {
+        return mostrarMensaje(mensaje, 'Nombre, precio y categoría son obligatorios', 'error');
+      }
+      const editando = Boolean(campos.id.value);
+      const json = await api(editando ? `/api/productos/${campos.id.value}` : '/api/productos', {
+        method: editando ? 'PATCH' : 'POST',
+        body: datos,
+      });
+      if (json.statusCode === 200) {
+        limpiarFormulario();
+        await cargarProductos();
+        mostrarMensaje(mensaje, editando ? 'Producto actualizado correctamente' : 'Producto creado correctamente', 'ok');
+      } else {
+        mostrarMensaje(mensaje, json.message, 'error');
+      }
+    });
+
+    btnCancelar.addEventListener('click', limpiarFormulario);
+    cargarCategorias().then(cargarProductos);
+  </script>
+</body>
+</html>

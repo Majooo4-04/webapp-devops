@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gestión de Usuarios</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main>
+    <nav id="nav"></nav>
+    <h1 id="titulo">Gestión de Usuarios</h1>
+
+    <form id="form-usuario" class="grid">
+      <input id="usuario-id" type="hidden">
+      <label for="nombre">Nombre <input id="nombre" type="text" autocomplete="off"></label>
+      <label for="email">Correo <input id="email" type="email" autocomplete="off"></label>
+      <label for="password">Contraseña <input id="password" type="password" autocomplete="new-password" placeholder="mín. 6 caracteres"></label>
+      <label for="rol">Rol
+        <select id="rol"><option value="usuario">usuario</option><option value="admin">admin</option></select>
+      </label>
+      <div class="acciones">
+        <button id="btn-guardar" type="submit">Guardar usuario</button>
+        <button id="btn-cancelar" class="secundario" type="button" hidden>Cancelar</button>
+      </div>
+    </form>
+    <p id="mensaje" class="mensaje" role="status"></p>
+
+    <table id="tabla-usuarios">
+      <thead><tr><th>ID</th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </main>
+  <script src="comun.js"></script>
+  <script>
+    exigirSesion();
+    pintarNavegacion();
+
+    const form = document.getElementById('form-usuario');
+    const mensaje = document.getElementById('mensaje');
+    const cuerpo = document.querySelector('#tabla-usuarios tbody');
+    const campos = {
+      id: document.getElementById('usuario-id'),
+      nombre: document.getElementById('nombre'),
+      email: document.getElementById('email'),
+      password: document.getElementById('password'),
+      rol: document.getElementById('rol'),
+    };
+    const btnCancelar = document.getElementById('btn-cancelar');
+
+    function limpiarFormulario() {
+      form.reset();
+      campos.id.value = '';
+      btnCancelar.hidden = true;
+      document.getElementById('btn-guardar').textContent = 'Guardar usuario';
+    }
+
+    function celda(texto) {
+      const td = document.createElement('td');
+      td.textContent = texto;
+      return td;
+    }
+
+    async function cargarUsuarios() {
+      const json = await api('/api/usuarios');
+      cuerpo.replaceChildren();
+      json.data.forEach((u) => {
+        const fila = document.createElement('tr');
+        fila.dataset.id = u.id;
+        const acciones = document.createElement('td');
+        acciones.className = 'acciones';
+        const editar = document.createElement('button');
+        editar.className = 'btn-editar chico';
+        editar.type = 'button';
+        editar.textContent = 'Editar';
+        editar.addEventListener('click', () => {
+          campos.id.value = u.id;
+          campos.nombre.value = u.nombre;
+          campos.email.value = u.email;
+          campos.password.value = '';
+          campos.rol.value = u.rol;
+          btnCancelar.hidden = false;
+          document.getElementById('btn-guardar').textContent = 'Actualizar usuario';
+        });
+        const eliminar = document.createElement('button');
+        eliminar.className = 'btn-eliminar peligro chico';
+        eliminar.type = 'button';
+        eliminar.textContent = 'Eliminar';
+        eliminar.addEventListener('click', async () => {
+          if (!confirm(`¿Eliminar al usuario "${u.nombre}"?`)) return;
+          const r = await api(`/api/usuarios/${u.id}`, { method: 'DELETE' });
+          if (r.statusCode === 200) {
+            await cargarUsuarios();
+            mostrarMensaje(mensaje, 'Usuario eliminado correctamente', 'ok');
+          } else {
+            mostrarMensaje(mensaje, r.message, 'error');
+          }
+        });
+        acciones.append(editar, eliminar);
+        fila.append(celda(u.id), celda(u.nombre), celda(u.email), celda(u.rol), acciones);
+        cuerpo.appendChild(fila);
+      });
+    }
+
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      const editando = Boolean(campos.id.value);
+      const datos = { nombre: campos.nombre.value.trim(), email: campos.email.value.trim(), rol: campos.rol.value };
+      if (campos.password.value) datos.password = campos.password.value;
+      const json = await api(editando ? `/api/usuarios/${campos.id.value}` : '/api/usuarios', {
+        method: editando ? 'PUT' : 'POST',
+        body: datos,
+      });
+      if (json.statusCode === 200) {
+        limpiarFormulario();
+        await cargarUsuarios();
+        mostrarMensaje(mensaje, editando ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente', 'ok');
+      } else {
+        mostrarMensaje(mensaje, json.message, 'error');
+      }
+    });
+
+    btnCancelar.addEventListener('click', limpiarFormulario);
+    cargarUsuarios();
+  </script>
+</body>
+</html>

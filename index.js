@@ -8,8 +8,9 @@ app.use(express.json());
 app.use('/app', express.static(path.join(__dirname, 'public')));
 
 const { metricsMiddleware } = require('./telemetry-middleware');
-app.use(metricsMiddleware);
 
+app.use(metricsMiddleware);
+require('./sistema')(app, db);
 // Formato de respuesta estándar: { statusCode, data: [] }
 const ok = (res, data = []) => res.status(200).json({ statusCode: 200, data });
 const fail = (res, code, message) =>

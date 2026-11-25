@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Panel de Categorías</title>
+  <link rel="stylesheet" href="estilos.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #f4f6f8; margin: 0; color: #1f2937; }
     main { max-width: 640px; margin: 40px auto; background: #fff; padding: 24px 28px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
@@ -27,6 +28,7 @@
 </head>
 <body>
   <main>
+    <nav id="nav"></nav>
     <h1 id="titulo">Panel de Categorías</h1>
     <p class="estado">Estado de la API: <span id="estado-api">comprobando...</span></p>
 
@@ -44,7 +46,11 @@
     </table>
   </main>
 
+  <script src="comun.js"></script>
   <script>
+    exigirSesion();
+    pintarNavegacion();
+
     const estadoApi = document.getElementById('estado-api');
     const mensaje = document.getElementById('mensaje');
     const cuerpoTabla = document.querySelector('#tabla-categorias tbody');
@@ -85,12 +91,10 @@
 
     form.addEventListener('submit', async (evento) => {
       evento.preventDefault();
-      const res = await fetch('/api/categorias', {
+      const json = await api('/api/categorias', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: inputNombre.value })
+        body: { nombre: inputNombre.value }
       });
-      const json = await res.json();
       if (json.statusCode === 200) {
         mostrarMensaje('Categoría creada correctamente', 'ok');
         inputNombre.value = '';
