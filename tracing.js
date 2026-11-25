@@ -19,10 +19,10 @@ const headers = { Authorization: `Basic ${process.env.O2_BASIC_TOKEN}` };
 
 const sdk = new NodeSDK({
   traceExporter: new OTLPTraceExporter({ url: `${BASE_URL}/v1/traces`, headers }),
-  metricReader: new PeriodicExportingMetricReader({
+  metricReaders: [new PeriodicExportingMetricReader({
     exporter: new OTLPMetricExporter({ url: `${BASE_URL}/v1/metrics`, headers }),
     exportIntervalMillis: 10000,
-  }),
+  })],
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-http': { enabled: true },
