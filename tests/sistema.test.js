@@ -112,6 +112,17 @@ describe('CRUD de usuarios', () => {
     expect(res.status).toBe(403);
   });
 
+  test('un usuario normal no puede listar ni consultar usuarios (403)', async () => {
+    const auth = await loginAdmin();
+    const email = `l${unico()}@correo.com`;
+    const crea = await request(app).post('/api/usuarios').set('Authorization', auth)
+      .send({ nombre: 'Lector', email, password: 'secreto1' });
+    const normal = await request(app).post('/api/login').send({ email, password: 'secreto1' });
+    const tokenNormal = `Bearer ${normal.body.data[0].token}`;
+    expect((await request(app).get('/api/usuarios').set('Authorization', tokenNormal)).status).toBe(403);
+    expect((await request(app).get(`/api/usuarios/${crea.body.data[0].id}`).set('Authorization', tokenNormal)).status).toBe(403);
+  });
+
   test('no se puede eliminar el propio usuario', async () => {
     const auth = await loginAdmin();
     const lista = await request(app).get('/api/usuarios').set('Authorization', auth);
@@ -168,6 +179,19 @@ describe('CRUD de productos (consulta, edición y eliminación)', () => {
     expect((await request(app).delete(`/api/productos/${id}`).set('Authorization', auth)).status).toBe(200);
     expect((await request(app).get(`/api/productos/${id}`)).status).toBe(404);
     expect((await request(app).delete(`/api/productos/${id}`).set('Authorization', auth)).status).toBe(404);
+  });
+
+  test('un usuario normal puede consultar pero no editar ni eliminar productos (403)', async () => {
+    const { id } = await crearProducto();
+    const auth = await loginAdmin();
+    const email = `r${unico()}@correo.com`;
+    await request(app).post('/api/usuarios').set('Authorization', auth)
+      .send({ nombre: 'Lector', email, password: 'secreto1' });
+    const normal = await request(app).post('/api/login').send({ email, password: 'secreto1' });
+    const tokenNormal = `Bearer ${normal.body.data[0].token}`;
+    expect((await request(app).get(`/api/productos/${id}`)).status).toBe(200);
+    expect((await request(app).patch(`/api/productos/${id}`).set('Authorization', tokenNormal).send({ precio: 1 })).status).toBe(403);
+    expect((await request(app).delete(`/api/productos/${id}`).set('Authorization', tokenNormal)).status).toBe(403);
   });
 
   test('DELETE de un producto con pedidos devuelve 409', async () => {

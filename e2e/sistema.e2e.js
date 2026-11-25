@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { ADMIN, sesionApi, cabeceras, entrarComoAdmin } = require('./helpers');
+const { ADMIN, sesionApi, cabeceras, entrarComoAdmin, crearUsuarioNormal, entrarComo } = require('./helpers');
 
 const unico = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -181,5 +181,55 @@ test.describe('Interfaz: login, productos y usuarios', () => {
     await page.locator('#tabla-usuarios tbody tr', { hasText: email }).locator('.btn-eliminar').click();
     await expect(page.locator('#mensaje')).toHaveText('Usuario eliminado correctamente');
     await expect(page.locator('#tabla-usuarios tbody')).not.toContainText(email);
+  });
+});
+
+test.describe('Rol "usuario": solo lectura', () => {
+  test('puede consultar categorías y productos', async ({ request }) => {
+    const { sesion } = await crearUsuarioNormal(request);
+    const headers = cabeceras(sesion.token);
+    expect((await request.get('/api/categorias', { headers })).status()).toBe(200);
+    expect((await request.get('/api/productos', { headers })).status()).toBe(200);
+  });
+
+  test('no puede crear, editar ni eliminar (403)', async ({ request }) => {
+    const { sesion } = await crearUsuarioNormal(request);
+    const headers = cabeceras(sesion.token);
+    expect((await request.post('/api/categorias', { data: { nombre: 'No permitida' }, headers })).status()).toBe(403);
+    expect((await request.post('/api/productos', { data: { nombre: 'X', precio: 1, categoria_id: 1 }, headers })).status()).toBe(403);
+    expect((await request.patch('/api/productos/1', { data: { precio: 5 }, headers })).status()).toBe(403);
+    expect((await request.delete('/api/productos/1', { headers })).status()).toBe(403);
+  });
+
+  test('no puede ver ni administrar usuarios (403)', async ({ request }) => {
+    const { sesion } = await crearUsuarioNormal(request);
+    const headers = cabeceras(sesion.token);
+    expect((await request.get('/api/usuarios', { headers })).status()).toBe(403);
+    expect((await request.post('/api/usuarios', { data: { nombre: 'X', email: 'x@correo.com', password: 'secreto1' }, headers })).status()).toBe(403);
+  });
+
+  test('interfaz: sin formularios ni botones de edición y sin acceso a Usuarios', async ({ page, request }) => {
+    const { sesion } = await crearUsuarioNormal(request);
+    await entrarComo(page, sesion);
+
+    await page.goto('/app/');
+    await expect(page.locator('#titulo')).toHaveText('Panel de Categorías');
+    await expect(page.locator('#form-categoria')).toBeHidden();
+    await expect(page.locator('#mensaje')).toContainText('solo lectura');
+    await expect(page.locator('#nav')).not.toContainText('Usuarios');
+
+    await page.goto('/app/productos.html');
+    await expect(page.locator('#titulo')).toHaveText('Gestión de Productos');
+    await expect(page.locator('#form-producto')).toBeHidden();
+    await expect(page.locator('.btn-eliminar')).toHaveCount(0);
+
+    await page.goto('/app/usuarios.html');
+    await expect(page).toHaveURL(/\/app\/$/);
+  });
+
+  test('el administrador sí ve los formularios', async ({ page, request }) => {
+    await entrarComoAdmin(page, request);
+    await page.goto('/app/productos.html');
+    await expect(page.locator('#form-producto')).toBeVisible();
   });
 });

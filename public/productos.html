@@ -25,7 +25,7 @@
     <p id="mensaje" class="mensaje" role="status"></p>
 
     <table id="tabla-productos">
-      <thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Categoría</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Categoría</th><th id="th-acciones">Acciones</th></tr></thead>
       <tbody></tbody>
     </table>
   </main>
@@ -45,6 +45,12 @@
       categoria: document.getElementById('categoria'),
     };
     const btnCancelar = document.getElementById('btn-cancelar');
+    const soloLectura = !esAdmin();
+    if (soloLectura) {
+      form.style.display = 'none';
+      document.getElementById('th-acciones').style.display = 'none';
+      mostrarMensaje(mensaje, MENSAJE_SOLO_LECTURA, 'ok');
+    }
 
     function limpiarFormulario() {
       form.reset();
@@ -90,7 +96,8 @@
         eliminar.textContent = 'Eliminar';
         eliminar.addEventListener('click', () => eliminarProducto(p.id, p.nombre));
         acciones.append(editar, eliminar);
-        fila.append(celda(p.id), celda(p.nombre), celda(Number(p.precio).toFixed(2)), celda(p.stock), celda(p.categoria), acciones);
+        fila.append(celda(p.id), celda(p.nombre), celda(Number(p.precio).toFixed(2)), celda(p.stock), celda(p.categoria));
+        if (!soloLectura) fila.appendChild(acciones);
         cuerpo.appendChild(fila);
       });
     }

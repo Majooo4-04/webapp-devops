@@ -91,7 +91,7 @@ function montarSistema(app, db) {
 
   const publico = (u) => ({ id: u.id, nombre: u.nombre, email: u.email, rol: u.rol });
 
-  // Las rutas de escritura de la API original exigen sesión. En NODE_ENV=test se
+  // Las rutas de escritura de la API original exigen sesión de administrador (el rol "usuario" es de solo lectura). En NODE_ENV=test se
   // desactiva para no alterar la suite unitaria heredada (AUTH_RUTAS_HEREDADAS=1 la fuerza).
   const exigirEnHeredadas =
     process.env.AUTH_RUTAS_HEREDADAS !== undefined
@@ -100,7 +100,8 @@ function montarSistema(app, db) {
   const PROTEGIDOS = ['/api/productos', '/api/categorias', '/api/clientes', '/api/pedidos', '/api/vaciar', '/api/respaldo'];
   app.use((req, res, next) => {
     if (!exigirEnHeredadas || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-    if (PROTEGIDOS.some((p) => req.path === p || req.path.startsWith(`${p}/`))) return exigirAuth(req, res, next);
+    if (PROTEGIDOS.some((p) => req.path === p || req.path.startsWith(`${p}/`)))
+      return exigirAuth(req, res, () => exigirAdmin(req, res, next));
     next();
   });
 
@@ -115,11 +116,11 @@ function montarSistema(app, db) {
   });
 
   /* ----- CRUD USUARIOS ----- */
-  app.get('/api/usuarios', exigirAuth, (req, res) => {
+  app.get('/api/usuarios', exigirAuth, exigirAdmin, (req, res) => {
     ok(res, db.prepare('SELECT id, nombre, email, rol, creado FROM usuarios ORDER BY id').all());
   });
 
-  app.get('/api/usuarios/:id', exigirAuth, (req, res) => {
+  app.get('/api/usuarios/:id', exigirAuth, exigirAdmin, (req, res) => {
     const u = db.prepare('SELECT id, nombre, email, rol, creado FROM usuarios WHERE id = ?').get(Number(req.params.id));
     if (!u) return fail(res, 404, 'Usuario no encontrado');
     ok(res, [u]);
@@ -189,7 +190,7 @@ function montarSistema(app, db) {
     ok(res, [p]);
   });
 
-  app.patch('/api/productos/:id', exigirAuth, (req, res) => {
+  app.patch('/api/productos/:id', exigirAuth, exigirAdmin, (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return fail(res, 400, 'El id debe ser un número entero');
     const actual = db.prepare('SELECT * FROM productos WHERE id = ?').get(id);
@@ -212,7 +213,7 @@ function montarSistema(app, db) {
     ok(res, [db.prepare('SELECT * FROM productos WHERE id = ?').get(id)]);
   });
 
-  app.delete('/api/productos/:id', exigirAuth, (req, res) => {
+  app.delete('/api/productos/:id', exigirAuth, exigirAdmin, (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return fail(res, 400, 'El id debe ser un número entero');
     if (!db.prepare('SELECT id FROM productos WHERE id = ?').get(id)) return fail(res, 404, 'Producto no encontrado');

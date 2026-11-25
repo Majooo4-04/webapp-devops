@@ -17,4 +17,20 @@ async function entrarComoAdmin(page, request) {
   }, [token, usuario]);
 }
 
-module.exports = { ADMIN, sesionApi, cabeceras, entrarComoAdmin };
+// Crea un usuario con rol "usuario" (solo lectura) y devuelve sus credenciales y sesión
+async function crearUsuarioNormal(request) {
+  const admin = cabeceras((await sesionApi(request)).token);
+  const sufijo = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const credenciales = { email: `lector-${sufijo}@correo.com`, password: 'secreto1' };
+  await request.post('/api/usuarios', { data: { nombre: `Lector ${sufijo}`, ...credenciales }, headers: admin });
+  return { credenciales, sesion: await sesionApi(request, credenciales) };
+}
+
+async function entrarComo(page, sesion) {
+  await page.addInitScript(([t, u]) => {
+    localStorage.setItem('token', t);
+    localStorage.setItem('usuario', JSON.stringify(u));
+  }, [sesion.token, sesion.usuario]);
+}
+
+module.exports = { ADMIN, sesionApi, cabeceras, entrarComoAdmin, crearUsuarioNormal, entrarComo };

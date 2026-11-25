@@ -29,6 +29,15 @@ function exigirSesion() {
   if (!Sesion.token()) location.href = '/app/login.html';
 }
 
+const esAdmin = () => (Sesion.usuario() || {}).rol === 'admin';
+
+// Pantallas reservadas a administradores: el rol "usuario" vuelve al panel
+function exigirAdminPagina() {
+  if (Sesion.token() && !esAdmin()) location.href = '/app/';
+}
+
+const MENSAJE_SOLO_LECTURA = 'Modo solo lectura: su rol no permite crear, editar ni eliminar.';
+
 function pintarNavegacion() {
   const nav = document.getElementById('nav');
   if (!nav) return;

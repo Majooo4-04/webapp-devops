@@ -57,6 +57,12 @@
     const form = document.getElementById('form-categoria');
     const inputNombre = document.getElementById('nombre');
 
+    // El rol "usuario" solo puede consultar
+    if (!esAdmin()) {
+      form.style.display = 'none';
+      mostrarMensaje(MENSAJE_SOLO_LECTURA, 'ok');
+    }
+
     function mostrarMensaje(texto, tipo) {
       mensaje.textContent = texto;
       mensaje.className = tipo;
