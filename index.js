@@ -174,7 +174,7 @@ app.delete('/api/vaciar', (req, res) => {
 app.get('/api/health', (req, res) => {
   ok(res, [{
     status: 'Listo',
-    version: '1.3.0',
+    version: '1.2.0',
     mensaje: 'Pipeline CI/CD funcionando correctamente',
     timestamp: new Date().toISOString()
   }]);
